@@ -1,7 +1,10 @@
-import { Alert, Button, Text, TextInput, View } from "react-native";
+import { Button, Text, TextInput, View, FlatList } from "react-native";
+import { useSafeAreaInsets} from 'react-native-safe-area-context';
 import { useForm, Controller} from "react-hook-form";
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import React, {useState, useEffect} from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // バリデーションルール定義
 const schema = z.object({
@@ -11,22 +14,39 @@ const schema = z.object({
 // z.inferで、Zodのルールから自動的に型を作る
 type FormData = z.infer<typeof schema>; // ?
 
-
 export default function App(){
+    const insets = useSafeAreaInsets();
+    const [history, setHistory] = useState<string[]>([]);
+
     //  react hook form セットアップ
     // control: 配線、 handleSubmit:送信時のチェック、 formState:フォームがどんな状態か教えてくれる
-    const {control, handleSubmit, formState: {errors}} = useForm<FormData>({
+    const {control, handleSubmit, reset, setValue, formState: {errors}} = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {title: ''}
     })
 
-    // dataは引数、 FormDataはdataの型
-    const onSubmit = (data: FormData) => {
-        Alert.alert('送信成功', JSON.stringify(data))
+    // 初回データの読み込み
+    useEffect(() => {
+        loadHistory();
+    }, []);
+
+    const loadHistory = async () => {
+        const saved = await AsyncStorage.getItem('@history_list');
+        if (saved) {
+            setHistory(JSON.parse(saved)); // 文字列を配列に戻す
+        }
     }
 
+    const onSubmit = async (data: FormData) => {
+        const newHistory = [data.title, ...history];
+        setHistory(newHistory);
+
+        await AsyncStorage.setItem('@history_list', JSON.stringify(newHistory));
+        reset(); // 入力欄を空にする
+    };
+
     return (
-        <View style={{flex: 1, padding: 20, justifyContent: 'center', backgroundColor: "#fff"}}>
+        <View style={[{flex: 1, padding: 20, justifyContent: 'center', backgroundColor: "#fff"},{paddingTop: insets.top + 20}]}>
             <Text style={{fontSize: 16, marginBottom: 8, fontWeight: 'bold'}}>タイトル</Text>
             <Controller
                 control={control}
@@ -50,6 +70,16 @@ export default function App(){
                 {/* handleSubmit(onSubmit)はなに？ */}
                 <Button title="保存" onPress={handleSubmit(onSubmit)} /> 
             </View>
+
+            <Text style={{fontSize: 18, fontWeight: 'bold', marginTop: 30, marginBottom: 10}}>保存済み一覧</Text>
+
+            <FlatList
+                data={history}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({item}) => (
+                    <Text style={{fontSize: 16}}>{item}</Text>
+                )}
+            ></FlatList>
         </View>
     );
 }
