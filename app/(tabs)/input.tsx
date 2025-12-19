@@ -1,4 +1,4 @@
-import { Button, Text, TextInput, View, FlatList } from "react-native";
+import { Alert, Button, Text, TextInput, View, FlatList, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets} from 'react-native-safe-area-context';
 import { useForm, Controller} from "react-hook-form";
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -45,6 +45,23 @@ export default function App(){
         reset(); // 入力欄を空にする
     };
 
+    const confirmDelete = (index: number) => {
+        Alert.alert(
+            "確認",
+            "この項目を削除してもよろしいですか？",
+            [
+                {text: "キャンセル", style: "cancel"},
+                {text: "削除", style: "destructive", onPress: () => deleteItem(index)}
+            ]
+        )
+    }
+    const deleteItem = async (index: number) => {
+        const newHistory = history.filter((_,i) => i !== index);
+
+        setHistory(newHistory);
+        await AsyncStorage.setItem('@histry_list', JSON.stringify(newHistory));
+    }
+
     return (
         <View style={[{flex: 1, padding: 20, justifyContent: 'center', backgroundColor: "#fff"},{paddingTop: insets.top + 20}]}>
             <Text style={{fontSize: 16, marginBottom: 8, fontWeight: 'bold'}}>タイトル</Text>
@@ -76,8 +93,18 @@ export default function App(){
             <FlatList
                 data={history}
                 keyExtractor={(item, index) => index.toString()}
-                renderItem={({item}) => (
-                    <Text style={{fontSize: 16}}>{item}</Text>
+                renderItem={({item, index}) => (
+                    <View style={{padding: 15, borderBottomWidth: 1, borderBottomColor: "#eee", flexDirection: "row", justifyContent: "space-between", alignItems: "center"}}>
+                        <Text style={{fontSize: 16, flex: 1}}>{item}</Text>
+
+                        <TouchableOpacity
+                            style={{padding: 5, marginLeft: 10, }}
+                            onPress={()=> confirmDelete(index)}
+                        >
+                            <Text style={{ color: "#ff4444", fontWeight: "bold"}}>削除</Text>
+
+                        </TouchableOpacity>
+                    </View>
                 )}
             ></FlatList>
         </View>
