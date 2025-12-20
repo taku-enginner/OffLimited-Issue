@@ -21,6 +21,10 @@ export default function TabLayout() {
         options={{ title: 'Create'}}
       />
       <Tabs.Screen
+        name="auth"
+        options={{ title: 'Auth'}}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
