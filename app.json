@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     // "scheme": "offlimitissue",
-    "scheme": "exp+0fflimitedissue",
+    "scheme": "exp+offlimitedissue",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
