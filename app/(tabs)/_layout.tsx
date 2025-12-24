@@ -15,15 +15,12 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: { display: 'none' },
       }}>
       <Tabs.Screen
         name="input"
-        options={{ title: 'Create'}}
-      />
-      <Tabs.Screen
-        name="index"
         options={{
-          title: 'Home',
+          title: 'Create',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />

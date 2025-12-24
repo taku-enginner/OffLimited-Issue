@@ -1,13 +1,13 @@
-import { Alert, Button, Text, TextInput, View, FlatList, TouchableOpacity } from "react-native";
-import { useSafeAreaInsets} from 'react-native-safe-area-context';
-import { useForm, Controller} from "react-hook-form";
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import React, {useState, useEffect} from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as z from 'zod';
 
-import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -24,8 +24,14 @@ const schema = z.object({
     title: z.string().min(1, 'タイトルは１文字以上で入力してください')
 })
 
+// 保存ボタン用（titleのみ）
+const saveSchema = z.object({
+    title: z.string().min(1, 'タイトルは１文字以上で入力してください')
+})
+
 // z.inferで、Zodのルールから自動的に型を作る
 type FormData = z.infer<typeof schema>; // ?
+type SaveFormData = z.infer<typeof saveSchema>;
 
 export default function App(){
     const insets = useSafeAreaInsets();
@@ -33,6 +39,9 @@ export default function App(){
 
     const [accessToken, setAccessToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [repoOwner, setRepoOwner] = useState('');
+    const [repoName, setRepoName] = useState('');
 
     const [request, response, promptAsync] = useAuthRequest(
         {
@@ -110,7 +119,7 @@ export default function App(){
     //  react hook form セットアップ
     // control: 配線、 handleSubmit:送信時のチェック、 formState:フォームがどんな状態か教えてくれる
     // getValues を追加
-    const { control, handleSubmit, reset, getValues, setValue, formState: { errors } } = useForm<FormData>({
+    const { control, handleSubmit, reset, getValues, setValue, setError, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {
             owner: '',
@@ -121,6 +130,7 @@ export default function App(){
     // 初回データの読み込み
     useEffect(() => {
         loadHistory();
+        loadRepoInfo();
     }, []);
 
     const loadHistory = async () => {
@@ -130,12 +140,59 @@ export default function App(){
         }
     }
 
-    const onSave = async (data: FormData) => {
+    const loadRepoInfo = async () => {
+        const savedOwner = await AsyncStorage.getItem('@repo_owner');
+        const savedRepo = await AsyncStorage.getItem('@repo_name');
+        if (savedOwner) {
+            setRepoOwner(savedOwner);
+            setValue('owner', savedOwner);
+        }
+        if (savedRepo) {
+            setRepoName(savedRepo);
+            setValue('repo', savedRepo);
+        }
+    }
+
+    const saveRepoInfo = async () => {
+        if (!repoOwner.trim() || !repoName.trim()) {
+            Alert.alert("入力エラー", "オーナー名とリポジトリ名を入力してください");
+            return;
+        }
+        await AsyncStorage.setItem('@repo_owner', repoOwner.trim());
+        await AsyncStorage.setItem('@repo_name', repoName.trim());
+        setValue('owner', repoOwner.trim());
+        setValue('repo', repoName.trim());
+        setModalVisible(false);
+        Alert.alert("保存完了", "リポジトリ情報を保存しました");
+    }
+
+    const onSave = async (data: SaveFormData) => {
         const newHistory = [data.title, ...history];
         setHistory(newHistory);
 
         await AsyncStorage.setItem('@history_list', JSON.stringify(newHistory));
         setValue('title', '');
+    };
+
+    const handleSave = async () => {
+        const titleValue = getValues('title');
+        const result = saveSchema.safeParse({ title: titleValue });
+        
+        if (!result.success) {
+            // titleのエラーのみ表示
+            const titleError = result.error.issues.find((e: z.ZodIssue) => e.path[0] === 'title');
+            if (titleError) {
+                setError('title', {
+                    type: 'manual',
+                    message: titleError.message || 'タイトルは１文字以上で入力してください'
+                });
+            }
+            return;
+        }
+        
+        // エラーをクリア
+        setValue('title', titleValue, { shouldValidate: false });
+        await onSave(result.data);
     };
 
     const confirmDelete = (index: number) => {
@@ -188,125 +245,521 @@ export default function App(){
     };
 
     return (
-        <View style={[{flex: 1, padding: 20, justifyContent: 'center', backgroundColor: "#fff"},{paddingTop: insets.top + 20}]}>
-            <Text style={{fontSize: 16, marginBottom: 8, fontWeight: 'bold'}}>オーナー名</Text>
-            <Controller
-                control={control}
-                name="owner"
-                // onBlur:入力欄から離れた瞬間にバリデーションをするためのもの
-                render={({field: {onChange, onBlur, value}}) => (
-                    <TextInput
-                    // エラーがある時に枠を赤くする→条件分岐。配列形式。配列を使うと、後ろの要素が優先されるので、エラーがある時はff4444が見えるようになる
-                    // 三項演算子でもかける
-                        style={[{height:50, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 15, marginBottom: 20},
-                             errors.title && {borderColor:"#ff4444"}]}
-                        placeholder="オーナー名を入力してください"
-                        onBlur={onBlur}
-                        value={value} // renderでvalueという引数を取り出している。それを使う。
-                        onChangeText={onChange}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        spellCheck={false}
-                    />
-                )}
-            />
-            <Text style={{fontSize: 16, marginBottom: 8, fontWeight: 'bold'}}>リポジトリ名</Text>
-            <Controller
-                control={control}
-                name="repo"
-                // onBlur:入力欄から離れた瞬間にバリデーションをするためのもの
-                render={({field: {onChange, onBlur, value}}) => (
-                    <TextInput
-                    // エラーがある時に枠を赤くする→条件分岐。配列形式。配列を使うと、後ろの要素が優先されるので、エラーがある時はff4444が見えるようになる
-                    // 三項演算子でもかける
-                        style={[{height:50, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 15, marginBottom: 20},
-                             errors.title && {borderColor:"#ff4444"}]}
-                        placeholder="リポジトリ名を入力してください"
-                        onBlur={onBlur}
-                        value={value} // renderでvalueという引数を取り出している。それを使う。
-                        onChangeText={onChange}
-                        autoCapitalize="none"      
-                        autoCorrect={false}
-                        spellCheck={false}
-                    />
-                )}
-            />
-            <Text style={{fontSize: 16, marginBottom: 8, fontWeight: 'bold'}}>issueタイトル</Text>
-            <Controller
-                control={control}
-                name="title"
-                // onBlur:入力欄から離れた瞬間にバリデーションをするためのもの
-                render={({field: {onChange, onBlur, value}}) => (
-                    <TextInput
-                    // エラーがある時に枠を赤くする→条件分岐。配列形式。配列を使うと、後ろの要素が優先されるので、エラーがある時はff4444が見えるようになる
-                    // 三項演算子でもかける
-                        style={[{height:50, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 15, marginBottom: 20},
-                             errors.title && {borderColor:"#ff4444"}]}
-                        placeholder="issueタイトルを入力してください"
-                        onBlur={onBlur}
-                        value={value} // renderでvalueという引数を取り出している。それを使う。
-                        onChangeText={onChange}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        spellCheck={false}
-                    />
-                )}
-            />
-            <View style={{marginTop: 10}}>
-                {/* handleSubmit(onSubmit)はなに？ */}
-                <Button title="保存" onPress={handleSubmit(onSave)} /> 
-                <Button 
-                    title="ログアウト（初期化）" 
+        <View style={[styles.container, {paddingTop: insets.top}]}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Issue作成</Text>
+                <TouchableOpacity 
+                    style={styles.repoButton}
                     onPress={() => {
-                        setAccessToken(null); // トークンを空にする
-                        Alert.alert("ログアウト", "認証情報をクリアしました。");
-                    }} 
-                    color="#ff4444" 
-                />
+                        setRepoOwner(getValues('owner') || '');
+                        setRepoName(getValues('repo') || '');
+                        setModalVisible(true);
+                    }}
+                >
+                    <Text style={styles.repoButtonText}>
+                        {repoOwner && repoName ? `${repoOwner}/${repoName}` : 'リポジトリ設定'}
+                    </Text>
+                </TouchableOpacity>
             </View>
-            <View style={{ marginTop: 10, padding: 5, backgroundColor: accessToken ? '#f0fff0' : '#fff' }}>
-                {!(accessToken) ? (
-                    <Button title="GitHubでログイン" onPress={() => promptAsync()} color="#24292e" />
-                ) : (
-                    history.length > 0 && (
-                        <TouchableOpacity 
-                            style={{ 
-                                backgroundColor: '#2ea44f', 
-                                padding: 15, 
-                                borderRadius: 8, 
-                                marginTop: 20,
-                                alignItems: 'center' 
-                            }}
-                            onPress={onGitHubSubmit}
-                            disabled={loading}
-                        >
-                            <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                {loading ? "送信中..." : `${history.length}件をGitHubに一括送信`}
-                            </Text>
-                        </TouchableOpacity>
-                    )
-                )}
+            <ScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.formSection}>
+                    <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Issueタイトル</Text>
+                    <Controller
+                        control={control}
+                        name="title"
+                        render={({field: {onChange, onBlur, value}}) => (
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    errors.title && styles.inputError
+                                ]}
+                                placeholder="Issueのタイトルを入力してください"
+                                placeholderTextColor="#9CA3AF"
+                                onBlur={onBlur}
+                                value={value}
+                                onChangeText={onChange}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                spellCheck={false}
+                            />
+                        )}
+                    />
+                    {errors.title && (
+                        <Text style={styles.errorText}>{errors.title.message}</Text>
+                    )}
+                </View>
+
+                <TouchableOpacity 
+                    style={styles.primaryButton}
+                    onPress={handleSave}
+                >
+                    <Text style={styles.primaryButtonText}>保存</Text>
+                </TouchableOpacity>
             </View>
 
-            <Text style={{fontSize: 18, fontWeight: 'bold', marginTop: 30, marginBottom: 10}}>下書き一覧</Text>
-
-            <FlatList
-                data={history}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({item, index}) => (
-                    <View style={{padding: 15, borderBottomWidth: 1, borderBottomColor: "#eee", flexDirection: "row", justifyContent: "space-between", alignItems: "center"}}>
-                        <Text style={{fontSize: 16, flex: 1}}>{item}</Text>
-
-                        <TouchableOpacity
-                            style={{padding: 5, marginLeft: 10, }}
-                            onPress={()=> confirmDelete(index)}
-                        >
-                            <Text style={{ color: "#ff4444", fontWeight: "bold"}}>削除</Text>
-
-                        </TouchableOpacity>
+            {history.length > 0 && (
+                <View style={styles.historySection}>
+                    <Text style={styles.sectionTitle}>下書き一覧</Text>
+                    <View style={styles.historyList}>
+                        {history.map((item, index) => (
+                            <View key={index} style={styles.historyCard}>
+                                <Text style={styles.historyItemText}>{item}</Text>
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => confirmDelete(index)}
+                                >
+                                    <Text style={styles.deleteButtonText}>削除</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ))}
                     </View>
+                </View>
+            )}
+            </ScrollView>
+
+            <View style={[styles.footer, {paddingBottom: insets.bottom, bottom: insets.bottom + 50}]}>
+                {!accessToken ? (
+                    <TouchableOpacity 
+                        style={styles.githubButton}
+                        onPress={() => promptAsync()}
+                    >
+                        <Text style={styles.githubButtonText}>GitHubでログイン</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <>
+                        {history.length > 0 && (
+                            <TouchableOpacity 
+                                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                                onPress={onGitHubSubmit}
+                                disabled={loading}
+                            >
+                                <Text style={styles.submitButtonText}>
+                                    {loading ? "送信中..." : `${history.length}件をGitHubに一括送信`}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        <View style={styles.authStatusCard}>
+                            <View style={styles.authStatusIndicator} />
+                            <Text style={styles.authStatusText}>GitHubに接続済み</Text>
+                            <TouchableOpacity 
+                                style={styles.logoutButton}
+                                onPress={() => {
+                                    setAccessToken(null);
+                                    Alert.alert("ログアウト", "認証情報をクリアしました。");
+                                }}
+                            >
+                                <Text style={styles.logoutButtonText}>ログアウト</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
                 )}
-            ></FlatList>
+            </View>
+
+            <View style={[styles.adBanner, {bottom: 0, paddingBottom: insets.bottom}]}>
+                <View style={styles.adBannerContent}>
+                    <Text style={styles.adBannerText}>広告</Text>
+                </View>
+            </View>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>リポジトリ情報</Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setModalVisible(false)}
+                            >
+                                <Text style={styles.modalCloseButtonText}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>オーナー名</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="例: facebook"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={repoOwner}
+                                    onChangeText={setRepoOwner}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    spellCheck={false}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>リポジトリ名</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="例: react"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={repoName}
+                                    onChangeText={setRepoName}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    spellCheck={false}
+                                />
+                            </View>
+
+                            <TouchableOpacity 
+                                style={styles.modalSaveButton}
+                                onPress={saveRepoInfo}
+                            >
+                                <Text style={styles.modalSaveButtonText}>保存</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F9FAFB',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        letterSpacing: -0.5,
+    },
+    repoButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    repoButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3B82F6',
+        letterSpacing: -0.2,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    contentContainer: {
+        padding: 20,
+        paddingBottom: 180,
+    },
+    formSection: {
+        marginBottom: 24,
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 20,
+        letterSpacing: -0.5,
+    },
+    inputGroup: {
+        marginBottom: 20,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+        letterSpacing: -0.2,
+    },
+    input: {
+        height: 52,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        fontSize: 16,
+        color: '#111827',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 1,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    inputError: {
+        borderColor: '#EF4444',
+        backgroundColor: '#FEF2F2',
+    },
+    errorText: {
+        fontSize: 12,
+        color: '#EF4444',
+        marginTop: 6,
+        marginLeft: 4,
+    },
+    primaryButton: {
+        backgroundColor: '#3B82F6',
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#3B82F6',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    primaryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        letterSpacing: -0.2,
+    },
+    footer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: -2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 8,
+    },
+    adBanner: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 50,
+        backgroundColor: '#F3F4F6',
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    adBannerContent: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    adBannerText: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        fontWeight: '500',
+    },
+    githubButton: {
+        backgroundColor: '#24292E',
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    githubButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        letterSpacing: -0.2,
+    },
+    authStatusCard: {
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    authStatusIndicator: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#10B981',
+        marginRight: 12,
+    },
+    authStatusText: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#111827',
+    },
+    logoutButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        backgroundColor: '#FEF2F2',
+    },
+    logoutButtonText: {
+        color: '#EF4444',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    submitButton: {
+        backgroundColor: '#10B981',
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+        shadowColor: '#10B981',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    submitButtonDisabled: {
+        opacity: 0.6,
+    },
+    submitButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        letterSpacing: -0.2,
+    },
+    historySection: {
+        marginTop: 8,
+    },
+    historyList: {
+        gap: 12,
+    },
+    historyCard: {
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    historyItemText: {
+        flex: 1,
+        fontSize: 15,
+        color: '#111827',
+        lineHeight: 22,
+    },
+    deleteButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        backgroundColor: '#FEF2F2',
+        marginLeft: 12,
+    },
+    deleteButtonText: {
+        color: '#EF4444',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingTop: 20,
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        letterSpacing: -0.5,
+    },
+    modalCloseButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalCloseButtonText: {
+        fontSize: 18,
+        color: '#6B7280',
+        fontWeight: '600',
+    },
+    modalBody: {
+        padding: 20,
+    },
+    modalSaveButton: {
+        backgroundColor: '#3B82F6',
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        shadowColor: '#3B82F6',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    modalSaveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        letterSpacing: -0.2,
+    },
+});
