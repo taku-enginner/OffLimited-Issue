@@ -11,16 +11,19 @@ import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const TEST_CLIENT_ID = 'Ov23li7qATNiA4Kef3nv';
+const PROD_CLIENT_ID = 'Ov23li3TNVQpNRwBQCnJ';
+
 const discovery = {
     authorizationEndpoint: 'https://github.com/login/oauth/authorize',
-    tokenEndpoint: 'https://github.com/login/oauth/access_token',
-    revocationEndpoint: 'https://github.com/settings/connections/applications/Ov23li7qATNiA4Kef3nv',
+    tokenEndpoint:         'https://github.com/login/oauth/access_token',
+    revocationEndpoint:    'https://github.com/settings/connections/applications/Ov23li7qATNiA4Kef3nv',
 };
 
 // バリデーションルール定義
 const schema = z.object({
     owner: z.string().min(1, 'リポジトリ名は１文字以上で入力してください'),
-    repo: z.string().min(1, 'issueタイトルは１文字以上で入力してください'),
+    repo:  z.string().min(1, 'issueタイトルは１文字以上で入力してください'),
     title: z.string().min(1, 'タイトルは１文字以上で入力してください')
 })
 
@@ -30,50 +33,66 @@ const saveSchema = z.object({
 })
 
 // z.inferで、Zodのルールから自動的に型を作る
-type FormData = z.infer<typeof schema>; // ?
+type FormData     = z.infer<typeof schema>; // ?
 type SaveFormData = z.infer<typeof saveSchema>;
 
 export default function App(){
     const insets = useSafeAreaInsets();
-    const [history, setHistory] = useState<string[]>([]);
-
-    const [accessToken, setAccessToken] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [history, setHistory]           = useState<string[]>([]);
+    const [accessToken, setAccessToken]   = useState<string | null>(null);
+    const [loading, setLoading]           = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
-    const [repoOwner, setRepoOwner] = useState('');
-    const [repoName, setRepoName] = useState('');
+    const [repoOwner, setRepoOwner]       = useState('');
+    const [repoName, setRepoName]         = useState('');
+
+    // 開発環境と本番環境でリダイレクトURIを切り替え
+    // 本番環境では、GitHub OAuthアプリの設定で登録されているリダイレクトURIと完全一致させる必要がある
+    const redirectUri =  
+        makeRedirectUri({
+            scheme: 'exp+offlimitedissue',
+            path:   'redirect',
+        });
+    if (__DEV__) {
+        alert("Check this URI: " + redirectUri);
+        console.log("Check this URI: " + redirectUri);
+    }
 
     const [request, response, promptAsync] = useAuthRequest(
         {
-            clientId: 'Ov23li7qATNiA4Kef3nv',
-            scopes: ['repo', 'user'],
-            usePKCE: false,
-            redirectUri: makeRedirectUri({
-                scheme: 'exp+offlimitedissue',
-                path: 'callback',
-            }),
+            // clientId:    TEST_CLIENT_ID,
+            clientId:    PROD_CLIENT_ID,
+            scopes:      ['repo', 'user'],
+            usePKCE:     false,
+            redirectUri: redirectUri,
         },
         discovery
     );
 
     // 認証レスポンス監視
     useEffect(() => {
-        if (response?.type === 'success' && !accessToken) {
+        console.log("useEffect: ", response);
+        if (response?.type === 'success' && !accessToken && 'params' in response) {
             const { code } = response.params;
             exchangeCodeForToken(code);
         }
-    }, [response]);
+    }, [response, accessToken]);
 
     // トークン交換
     const exchangeCodeForToken = async (code: string) => {
+        console.log("code:", code);
         try {
             const res = await fetch('https://github.com/login/oauth/access_token', {
-                method: 'POST',
-                headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+                method:  'POST',
+                headers: { 
+                    'Accept':       'application/json',
+                    'Content-Type': 'application/json',
+                 },
                 body: JSON.stringify({
-                    client_id: 'Ov23li7qATNiA4Kef3nv',
-                    client_secret: process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET, // ★ここに貼り付け
-                    code: code,
+                    // client_id:     TEST_CLIENT_ID,
+                    client_id:     PROD_CLIENT_ID,
+                    // client_secret: process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET,
+                    client_secret: process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET_PROD,
+                    code:          code,
                 }),
             });
             const data = await res.json();
@@ -97,8 +116,8 @@ export default function App(){
             const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    Accept: 'application/vnd.github+json',
+                    Authorization:  `Bearer ${accessToken}`,
+                    Accept:         'application/vnd.github+json',
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ title: title, body: 'Appから送信' }),
@@ -123,8 +142,8 @@ export default function App(){
         resolver: zodResolver(schema),
         defaultValues: {
             owner: '',
-            repo: '',
-            title: ''
+            repo:  '',
+            title: '',
         }
     });
     // 初回データの読み込み
@@ -142,7 +161,7 @@ export default function App(){
 
     const loadRepoInfo = async () => {
         const savedOwner = await AsyncStorage.getItem('@repo_owner');
-        const savedRepo = await AsyncStorage.getItem('@repo_name');
+        const savedRepo  = await AsyncStorage.getItem('@repo_name');
         if (savedOwner) {
             setRepoOwner(savedOwner);
             setValue('owner', savedOwner);
@@ -176,7 +195,7 @@ export default function App(){
 
     const handleSave = async () => {
         const titleValue = getValues('title');
-        const result = saveSchema.safeParse({ title: titleValue });
+        const result     = saveSchema.safeParse({ title: titleValue });
         
         if (!result.success) {
             // titleのエラーのみ表示
@@ -360,11 +379,11 @@ export default function App(){
                 )}
             </View>
 
-            <View style={[styles.adBanner, {bottom: 0, paddingBottom: insets.bottom}]}>
+            {/* <View style={[styles.adBanner, {bottom: 0, paddingBottom: insets.bottom}]}>
                 <View style={styles.adBannerContent}>
                     <Text style={styles.adBannerText}>広告</Text>
                 </View>
-            </View>
+            </View> */}
 
             <Modal
                 animationType="slide"

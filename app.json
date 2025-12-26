@@ -1,11 +1,10 @@
 {
   "expo": {
-    "name": "OffLimitIssue",
-    "slug": "OffLimitIssue",
+    "name": "OffLimitedIssue",
+    "slug": "OffLimitedIssue",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    // "scheme": "offlimitissue",
     "scheme": "exp+offlimitedissue",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.taka4655.offlimitedissue",
       "config": {
-        "usesNonExemptEncryption": false,
+        "usesNonExemptEncryption": false
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -55,10 +54,18 @@
       "reactCompiler": true
     },
     "extra": {
+      "privacyPolicyUrl": "https://taku-enginner.github.io/apps/offlimitedissue/index.html",
       "router": {},
       "eas": {
-        "projectId": "ecad7e27-c26e-40f3-9cb3-b8f36daccbe5"
+        "projectId": "af60afa3-cddc-400d-ac46-0de465205d00"
       }
+    },
+    "owner": "taka4655",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/af60afa3-cddc-400d-ac46-0de465205d00"
     }
   }
 }
