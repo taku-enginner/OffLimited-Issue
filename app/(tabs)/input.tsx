@@ -11,13 +11,18 @@ import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const CLIENT_ID     = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID;
-const CLIENT_SECRET = process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET;
+const CLIENT_ID = __DEV__ 
+  ? process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID_DEV 
+  : process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID_PROD;
+
+const CLIENT_SECRET = __DEV__
+  ? process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET_DEV
+  : process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET_PROD;
 
 const discovery = {
     authorizationEndpoint: 'https://github.com/login/oauth/authorize',
     tokenEndpoint:         'https://github.com/login/oauth/access_token',
-    revocationEndpoint:    'https://github.com/settings/connections/applications/Ov23li7qATNiA4Kef3nv',
+    revocationEndpoint:    'https://github.com/settings/connections/applications/' + CLIENT_ID,
 };
 
 // バリデーションルール定義
@@ -50,44 +55,31 @@ export default function App(){
     const redirectUri =  
         makeRedirectUri({
             scheme: 'exp+offlimitedissue',
-            path:   'redirect',
+            path: 'redirect',
+            // preferLocalhost: __DEV__,
         });
-    if (__DEV__) {
-        alert("Check this URI: " + redirectUri);
-        console.log("Check this URI: " + redirectUri);
-    }
 
     const [request, response, promptAsync] = useAuthRequest(
         {
             clientId:    CLIENT_ID ?? "",
             scopes:      ['repo', 'user'],
             redirectUri: redirectUri,
+            usePKCE: false,
         },
         discovery
     );
 
     // 認証レスポンス監視
     useEffect(() => {
-        console.log("useEffect: ", response);
-        if (!process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID) {
-            alert("エラー: ClientIDが読み込めていません");
-            return;
-          }
-        if (!process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET) {
-        alert("エラー: ClientSecretが読み込めていません");
-        return;
-        }
         if (response?.type === 'success' && !accessToken && 'params' in response) {
             const { code } = response.params;
             exchangeCodeForToken(code);
-        } else {
-            alert(response);
         }
     }, [response, accessToken]);
 
+
     // トークン交換
     const exchangeCodeForToken = async (code: string) => {
-        console.log("code:", code);
         try {
             const res = await fetch('https://github.com/login/oauth/access_token', {
                 method:  'POST',
