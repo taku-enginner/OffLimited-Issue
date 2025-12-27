@@ -11,8 +11,8 @@ import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const TEST_CLIENT_ID = 'Ov23li7qATNiA4Kef3nv';
-const PROD_CLIENT_ID = 'Ov23li3TNVQpNRwBQCnJ';
+const CLIENT_ID     = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID;
+const CLIENT_SECRET = process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET;
 
 const discovery = {
     authorizationEndpoint: 'https://github.com/login/oauth/authorize',
@@ -59,10 +59,8 @@ export default function App(){
 
     const [request, response, promptAsync] = useAuthRequest(
         {
-            // clientId:    TEST_CLIENT_ID,
-            clientId:    PROD_CLIENT_ID,
+            clientId:    CLIENT_ID ?? "",
             scopes:      ['repo', 'user'],
-            usePKCE:     false,
             redirectUri: redirectUri,
         },
         discovery
@@ -88,10 +86,8 @@ export default function App(){
                     'Content-Type': 'application/json',
                  },
                 body: JSON.stringify({
-                    // client_id:     TEST_CLIENT_ID,
-                    client_id:     PROD_CLIENT_ID,
-                    // client_secret: process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET,
-                    client_secret: process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET_PROD,
+                    client_id:     CLIENT_ID,
+                    client_secret: CLIENT_SECRET,
                     code:          code,
                 }),
             });
