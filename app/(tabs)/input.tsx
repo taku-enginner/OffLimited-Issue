@@ -69,9 +69,19 @@ export default function App(){
     // 認証レスポンス監視
     useEffect(() => {
         console.log("useEffect: ", response);
+        if (!process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID) {
+            alert("エラー: ClientIDが読み込めていません");
+            return;
+          }
+        if (!process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET) {
+        alert("エラー: ClientSecretが読み込めていません");
+        return;
+        }
         if (response?.type === 'success' && !accessToken && 'params' in response) {
             const { code } = response.params;
             exchangeCodeForToken(code);
+        } else {
+            alert(response);
         }
     }, [response, accessToken]);
 
