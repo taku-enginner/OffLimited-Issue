@@ -107,6 +107,7 @@ export default function App(){
               if (data.access_token) {
                 // Firebaseから受け取ったトークンをセットする処理をここに記述
                 // 例: setAccessToken(data.access_token);
+                setAccessToken(data.access_token);
                 console.log("Token obtained via Firebase");
               }
             } catch (error) {

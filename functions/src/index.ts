@@ -61,7 +61,7 @@ export const getGithubToken = functions.https.onCall<GetGithubTokenData>(
       const response = await axios.post(
         "https://github.com/login/oauth/access_token",
         {
-          client_id: "あなたのGITHUB_CLIENT_ID", // 本番用のIDを入力
+          client_id: "Ov23li3TNVQpNRwBQCnJ", // 本番用のIDを入力
           client_secret: process.env.GITHUB_CLIENT_SECRET, // Firebaseが自動注入
           code: code,
         },
