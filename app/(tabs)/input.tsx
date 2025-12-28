@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
+import * as TrackingTransparency from 'expo-tracking-transparency';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -63,8 +64,8 @@ export default function App(){
     // 本番環境では、GitHub OAuthアプリの設定で登録されているリダイレクトURIと完全一致させる必要がある
     const redirectUri =  
         makeRedirectUri({
-            scheme: 'exp+offlimitedissue',
-            path: 'redirect',
+            scheme: 'exp+olis',
+            path: 'oauthredirect',
             preferLocalhost: __DEV__,
         });
     console.log(redirectUri);
@@ -225,11 +226,23 @@ export default function App(){
     // 初回データの読み込み
     useEffect(() => {
         const initializeApp = async () => {
+            await requestTrackingTransparency();
             await loadHistory();
             await loadRepoInfo();
         };
         initializeApp();
     }, []);
+
+    const requestTrackingTransparency = async () => {
+        try {
+            const { status } = await TrackingTransparency.requestTrackingPermissionsAsync();
+            if (status === 'granted') {
+                console.log('ATT tracking transparency permission granted');
+            }
+        } catch (error) {
+            console.error('Error requesting tracking transparency:', error);
+        }
+    };
 
     const loadHistory = async () => {
         const saved = await AsyncStorage.getItem('@history_list');
