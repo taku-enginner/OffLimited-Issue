@@ -12,6 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.taka4655.offlimitedissue",
       "config": {
+        "googleMobileAdsAppId": "ca-app-pub-3940256099942544~1458002511",
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
@@ -70,8 +71,7 @@
     }
   },
   "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-6214815327107771~8358056419",
-    "ios_app_id": "ca-app-pub-6214815327107771/3336845786",
+    "ios_app_id": "ca-app-pub-6214815327107771~8358056419",
     "user_tracking_usage_description": "関連性の高い広告を表示するためにIDをトラッキングいたします。"
   }
 }

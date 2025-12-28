@@ -1,12 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
-import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import mobileAds from 'react-native-google-mobile-ads';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as z from 'zod';
 
@@ -21,6 +20,7 @@ const CLIENT_SECRET = __DEV__
   ? process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET_DEV
   : process.env.EXPO_PUBLIC_GITHUB_CLIENT_SECRET_PROD;
 
+const adUnitId = __DEV__ ? TestIds.BANNER : 'ca-app-pub-6214815327107771/3336845786';
 const discovery = {
     authorizationEndpoint: 'https://github.com/login/oauth/authorize',
     tokenEndpoint:         'https://github.com/login/oauth/access_token',
@@ -65,8 +65,9 @@ export default function App(){
         makeRedirectUri({
             scheme: 'exp+offlimitedissue',
             path: 'redirect',
-            // preferLocalhost: __DEV__,
+            preferLocalhost: __DEV__,
         });
+    console.log(redirectUri);
 
     const [request, response, promptAsync] = useAuthRequest(
         {
@@ -209,36 +210,6 @@ export default function App(){
         setShowRepoSuggestions(false);
     };
 
-    const createGitHubIssue = async (title: string) => {
-        if (!accessToken) {
-            Alert.alert("エラー", "先にGitHubログインをしてください");
-            return;
-        }
-        const {owner, repo} = getValues();
-        setLoading(true);
-        try {
-            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
-                method: 'POST',
-                headers: {
-                    Authorization:  `Bearer ${accessToken}`,
-                    Accept:         'application/vnd.github+json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ title: title, body: 'Appから送信' }),
-            });
-            if (res.ok) {
-                Alert.alert("成功", "GitHubにIssueを作成しました！");
-            } else {
-                Alert.alert("失敗", "Issueの作成に失敗しました");
-            }
-        } catch (e) {
-            Alert.alert("エラー", "通信失敗");
-            console.log(e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     //  react hook form セットアップ
     // control: 配線、 handleSubmit:送信時のチェック、 formState:フォームがどんな状態か教えてくれる
     // getValues を追加
@@ -250,30 +221,15 @@ export default function App(){
             title: '',
         }
     });
-    const initAd = useCallback(async () => {
-        try {
-          // ここに追加
-          const { status } = await requestTrackingPermissionsAsync();
-            if (status === 'granted') {
-              console.log('Yay! I have user permission to track data');
-           }
-
-          await mobileAds().initialize();
-        } catch (err) {
-          console.warn('initAd', err);
-        }
-      }, []);
 
     // 初回データの読み込み
     useEffect(() => {
         const initializeApp = async () => {
             await loadHistory();
             await loadRepoInfo();
-            await initAd();
         };
-        
         initializeApp();
-    }, [initAd]);
+    }, []);
 
     const loadHistory = async () => {
         const saved = await AsyncStorage.getItem('@history_list');
@@ -402,7 +358,7 @@ export default function App(){
                                 Accept: 'application/vnd.github+json',
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ title: title, body: 'Appから送信' }),
+                            body: JSON.stringify({ title: title, body: 'Olisから送信' }),
                         }
                     );
 
@@ -536,7 +492,7 @@ export default function App(){
             )}
             </ScrollView>
 
-            <View style={[styles.footer, {paddingBottom: insets.bottom, bottom: insets.bottom + 50}]}>
+            <View style={[styles.footer, {paddingBottom: insets.bottom, bottom: insets.bottom + 20}]}>
                 {accessToken && (
                     <>
                         {history.length > 0 && (
@@ -553,13 +509,13 @@ export default function App(){
                     </>
                 )}
             </View>
-
-            {/* <View style={[styles.adBanner, {bottom: 0, paddingBottom: insets.bottom}]}>
-                <View style={styles.adBannerContent}>
-                    <Text style={styles.adBannerText}>広告</Text>
-                </View>
-            </View> */}
-
+            <View style={[styles.adBanner, {bottom: insets.bottom}]}>
+                <BannerAd
+                  unitId={adUnitId} // ←ここに設定する！
+                  size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                  onAdFailedToLoad={(error) => console.error(error)}
+                />
+            </View>
             <Modal
                 animationType="slide"
                 transparent={true}
