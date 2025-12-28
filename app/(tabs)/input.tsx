@@ -62,11 +62,15 @@ export default function App(){
 
     // 開発環境と本番環境でリダイレクトURIを切り替え
     // 本番環境では、GitHub OAuthアプリの設定で登録されているリダイレクトURIと完全一致させる必要がある
-    const redirectUri =  
+    const redirectUri = __DEV__ ?   
         makeRedirectUri({
             scheme: 'exp+olis',
             path: 'oauthredirect',
             preferLocalhost: __DEV__,
+        }) : 
+        makeRedirectUri({
+            scheme: 'olis',
+            path: 'oauthredirect',
         });
     console.log(redirectUri);
 
