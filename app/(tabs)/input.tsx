@@ -47,6 +47,7 @@ export default function App(){
     const [accessToken, setAccessToken]   = useState<string | null>(null);
     const [loading, setLoading]           = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
+    const [helpModalVisible, setHelpModalVisible] = useState(false);
     const [repoOwner, setRepoOwner]       = useState('');
     const [repoName, setRepoName]         = useState('');
     const [userName, setUserName]         = useState('');
@@ -104,7 +105,6 @@ export default function App(){
                 setAccessToken(data.access_token);
                 // トークンを取得したら、ユーザー情報を取得してリポジトリ一覧を読み込む
                 await fetchUserAndRepositories(data.access_token);
-                Alert.alert("認証成功", "GitHub連携が完了しました");
             }
         } catch (e) {
             Alert.alert("エラー", "認証に失敗しました");
@@ -427,15 +427,32 @@ export default function App(){
     return (
         <View style={[styles.container, {paddingTop: insets.top}]}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Issue作成</Text>
                 <TouchableOpacity 
-                    style={styles.repoButton}
-                    onPress={handleModalOpen}
+                    style={styles.titleButton}
+                    onPress={() => setHelpModalVisible(true)}
                 >
-                    <Text style={styles.repoButtonText}>
-                        {repoOwner && repoName ? `${repoOwner}/${repoName}` : 'リポジトリ設定'}
-                    </Text>
+                    <Text style={styles.headerTitle}>Olis</Text>
+                    <View style={styles.helpIcon}>
+                        <Text style={styles.helpIconText}>?</Text>
+                    </View>
                 </TouchableOpacity>
+                {!accessToken ? (
+                    <TouchableOpacity 
+                        style={styles.githubButton}
+                        onPress={() => promptAsync()}
+                    >
+                        <Text style={styles.githubButtonText}>GitHubでログイン</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity 
+                        style={styles.repoButton}
+                        onPress={handleModalOpen}
+                    >
+                        <Text style={styles.repoButtonText}>
+                            {repoOwner && repoName ? `${repoOwner}/${repoName}` : 'リポジトリ設定'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
             <ScrollView 
                 style={styles.scrollView}
@@ -499,14 +516,7 @@ export default function App(){
             </ScrollView>
 
             <View style={[styles.footer, {paddingBottom: insets.bottom, bottom: insets.bottom + 50}]}>
-                {!accessToken ? (
-                    <TouchableOpacity 
-                        style={styles.githubButton}
-                        onPress={() => promptAsync()}
-                    >
-                        <Text style={styles.githubButtonText}>GitHubでログイン</Text>
-                    </TouchableOpacity>
-                ) : (
+                {accessToken && (
                     <>
                         {history.length > 0 && (
                             <TouchableOpacity 
@@ -519,19 +529,6 @@ export default function App(){
                                 </Text>
                             </TouchableOpacity>
                         )}
-                        <View style={styles.authStatusCard}>
-                            <View style={styles.authStatusIndicator} />
-                            <Text style={styles.authStatusText}>GitHubに接続済み</Text>
-                            <TouchableOpacity 
-                                style={styles.logoutButton}
-                                onPress={() => {
-                                    setAccessToken(null);
-                                    Alert.alert("ログアウト", "認証情報をクリアしました。");
-                                }}
-                            >
-                                <Text style={styles.logoutButtonText}>ログアウト</Text>
-                            </TouchableOpacity>
-                        </View>
                     </>
                 )}
             </View>
@@ -563,8 +560,22 @@ export default function App(){
                         <View style={styles.modalBody}>
                             {!accessToken ? (
                                 <Text style={styles.noAuthText}>GitHubにサインインしてリポジトリを選択してください</Text>
+                                
                             ) : (
                                 <>
+                                    <View style={styles.authStatusCard}>
+                                        <View style={styles.authStatusIndicator} />
+                                        <Text style={styles.authStatusText}>GitHubに接続済み</Text>
+                                        <TouchableOpacity 
+                                            style={styles.logoutButton}
+                                            onPress={() => {
+                                                setAccessToken(null);
+                                                Alert.alert("ログアウト", "認証情報をクリアしました。");
+                                            }}
+                                        >
+                                            <Text style={styles.logoutButtonText}>ログアウト</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>ユーザー名</Text>
                                         <TextInput
@@ -645,6 +656,66 @@ export default function App(){
                     </View>
                 </View>
             </Modal>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={helpModalVisible}
+                onRequestClose={() => setHelpModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Olisの使い方</Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setHelpModalVisible(false)}
+                            >
+                                <Text style={styles.modalCloseButtonText}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalBody}>
+                            <View style={styles.helpSection}>
+                                <Text style={styles.helpStepTitle}>1. GitHubにログイン</Text>
+                                <Text style={styles.helpStepText}>
+                                    右上の「GitHubでログイン」ボタンをタップして、GitHubアカウントと連携します。
+                                </Text>
+                            </View>
+
+                            <View style={styles.helpSection}>
+                                <Text style={styles.helpStepTitle}>2. リポジトリを設定</Text>
+                                <Text style={styles.helpStepText}>
+                                    右上のボタンからIssueを作成したいリポジトリを選択します。よく使うリポジトリは自動的に上位表示されます。
+                                </Text>
+                            </View>
+
+                            <View style={styles.helpSection}>
+                                <Text style={styles.helpStepTitle}>3. 下書きを保存</Text>
+                                <Text style={styles.helpStepText}>
+                                    Issueタイトルを入力して「保存」ボタンをタップすると、下書きとして保存されます。複数の下書きを作成できます。
+                                </Text>
+                            </View>
+
+                            <View style={styles.helpSection}>
+                                <Text style={styles.helpStepTitle}>4. 一括送信</Text>
+                                <Text style={styles.helpStepText}>
+                                    下部の「一括送信」ボタンで、すべての下書きをGitHub Issueとして作成できます。送信に失敗したものは下書きに残ります。
+                                </Text>
+                            </View>
+
+                            <View style={styles.helpTip}>
+                                <Text style={styles.helpTipTitle}>💡 ヒント</Text>
+                                <Text style={styles.helpTipText}>
+                                    • リポジトリ名を入力すると、自動でオートコンプリートが表示されます{"\n"}
+                                    • 使用頻度の高いリポジトリには ★ マークが付きます{"\n"}
+                                    • 下書きは削除するまでアプリ内に保存されます
+                                </Text>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -669,6 +740,24 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#111827',
         letterSpacing: -0.5,
+    },
+    titleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    helpIcon: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#3B82F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    helpIconText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '700',
     },
     repoButton: {
         paddingVertical: 8,
@@ -803,24 +892,17 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     githubButton: {
-        backgroundColor: '#24292E',
-        paddingVertical: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     githubButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
+        color: '#3B82F6',
         letterSpacing: -0.2,
     },
     authStatusCard: {
@@ -1026,5 +1108,38 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         letterSpacing: -0.2,
+    },
+    helpSection: {
+        marginBottom: 24,
+    },
+    helpStepTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 8,
+    },
+    helpStepText: {
+        fontSize: 14,
+        color: '#6B7280',
+        lineHeight: 22,
+    },
+    helpTip: {
+        backgroundColor: '#EFF6FF',
+        padding: 16,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#3B82F6',
+        marginTop: 8,
+    },
+    helpTipTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1E40AF',
+        marginBottom: 8,
+    },
+    helpTipText: {
+        fontSize: 13,
+        color: '#1E40AF',
+        lineHeight: 20,
     },
 });
