@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.taka4655.olis",
+      "buildNumber": "1",
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-3940256099942544~1458002511",
         "usesNonExemptEncryption": false
