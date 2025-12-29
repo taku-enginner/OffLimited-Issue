@@ -98,7 +98,6 @@ export default function App(){
     // 認証レスポンス監視
     useEffect(() => {
       const app = getApp();
-      Alert.alert("Firebase App projectid: ", app.options.projectId);
       const handleAuthentication = async () => {
         if (response?.type === 'success' && !accessToken && 'params' in response) {
           const { code } = response.params;
@@ -113,11 +112,6 @@ export default function App(){
             const functions = getFunctions(app, 'asia-northeast1');
             const getGithubToken = httpsCallable(functions, 'getGithubToken');
             const expectedUrl = `https://asia-northeast1-${functions.app.options.projectId}.cloudfunctions.net/getGithubToken`;
-            Alert.alert("Debug Info", 
-              `Target URL: ${expectedUrl}\n` +
-              `Project ID: ${functions.app.options.projectId}\n` +
-              `Region: ${functions.region}`
-            );
 
             try {
               const result = await getGithubToken({ code });
